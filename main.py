@@ -725,8 +725,6 @@ def handle_callback(call):
         return
 
     if data == "dc_change":
-        if user_id != call.message.reply_markup.inline_keyboard[0][0].callback_data: # Buton kontrolü için ek önlem
-            pass
         if user_id != oyun.get("answerer_id"):
             bot.answer_callback_query(call.id, "Sadece cevap veren kullanabilir!", show_alert=True)
             return
