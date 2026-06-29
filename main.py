@@ -256,6 +256,36 @@ def start_lobby(chat_id):
 # KOMUTLAR
 # ==========================================
 
+@bot.message_handler(commands=['oynanis'])
+def cmd_oynanis(message):
+    if message.chat.id != GAME_GROUP_ID or getattr(message, 'message_thread_id', None) != GAME_THREAD_ID:
+        try: bot.delete_message(message.chat.id, message.message_id)
+        except: pass
+        return
+        
+    s = get_settings(message.chat.id)
+    
+    oynanis_metni = (
+        "🎮 <b>DOĞRULUK MU CESARET Mİ - DETAYLI OYNANIŞ KILAVUZU</b>\n\n"
+        "Oyunun işleyiş sırası ve butonların kullanım detayları aşağıda belirtilmiştir:\n\n"
+        "<b>1. Adım: Katılım (Lobi) Aşaması</b>\n"
+        "• Oyun <code>/basla</code> komutu ile kurulur. Katılmak isteyenler <b>Katıl</b> butonuna tıklar veya <code>/katil</code> yazar.\n"
+        f"• Katılım için ilk süre <b>{s['lobby_time']} saniyedir</b>. Oda kurucusu dilerse <b>+15 Saniye</b> butonu ile süreyi uzatabilir.\n\n"
+        "<b>2. Adım: Şişe Çevrimi ve Rol Dağılımı</b>\n"
+        "• Lobi süresi bittiğinde sistem otomatik olarak iki oyuncu seçer. Ekrandaki etiketlemede kimin <b>Soracağı</b> ve kimin <b>Cevaplayacağı</b> belirtilir.\n\n"
+        "<b>3. Adım: Kategori Seçimi</b>\n"
+        f"• Cevaplayacak oyuncunun önüne <b>Doğruluk</b> ve <b>Cesaret</b> butonları gelir. Seçim için <b>{s['category_time']} saniye</b> süre tanınır.\n"
+        f"• <u>Kural:</u> Üst üste maksimum <b>{s.get('truth_limit', 3)} kez</b> Doğruluk seçilebilir. Bu limit dolduğunda Doğruluk butonu kilitlenir ve oyuncu mecburen Cesaret seçmek zorundadır. Cesaret görevi alındığında bu sayaç sıfırlanır.\n\n"
+        "<b>4. Adım: Sorunun Canlı Yazılması</b>\n"
+        f"• Kategori seçildikten sonra, soracak oyuncunun <b>{s['question_time']} saniye</b> içinde sorusunu veya görevini sohbete normal bir mesaj olarak yazması gerekir.\n\n"
+        "<b>5. Adım: Cevaplama ve Pas Hakkı</b>\n"
+        f"• Soru ekrana düştüğünde cevaplayacak oyuncunun eyleme geçmesi için <b>{s['answer_time']} saniyesi</b> başlar.\n"
+        "• Oyuncu soruyu yanıtlamak istemezse <b>Değiştir</b> butonuna basarak Pas hakkını kullanabilir (Oyun boyu limit: 3). Pas seçilirse tur atlanmaz, soruyu soran kişiden tekrar yeni bir soru yazması istenir.\n"
+        "• Cevaplama veya görev tamamlandığında, soruyu soran veya cevaplayan oyunculardan biri <b>Sıradaki Tur</b> butonuna basarak şişeyi yeniden çevirir.\n\n"
+        "<b>⚠️ Önemli Hatırlatma:</b> Kategori seçme, soru yazma ve cevaplama aşamalarında kendine tanınan süre içinde hamle yapmayan oyuncular sistem tarafından <u>otomatik olarak oyundan ihraç edilir</u>."
+    )
+    bot.reply_to(message, oynanis_metni, parse_mode="HTML")
+
 @bot.message_handler(commands=['iptal'])
 def cmd_iptal(message):
     if message.chat.id != GAME_GROUP_ID or getattr(message, 'message_thread_id', None) != GAME_THREAD_ID:
@@ -725,13 +755,15 @@ def handle_callback(call):
         return
 
     if data == "dc_change":
+        if user_id != call.message.reply_markup.inline_keyboard[0][0].callback_data: 
+            pass
         if user_id != oyun.get("answerer_id"):
             bot.answer_callback_query(call.id, "Sadece cevap veren kullanabilir!", show_alert=True)
             return
         if oyun["pass_rights"].get(user_id, 0) <= 0:
             bot.answer_callback_query(call.id, "Pas hakkın kalmadı!", show_alert=True)
             return
-           
+            
         oyun["pass_rights"][user_id] -= 1
         s = get_settings(chat_id)
         
