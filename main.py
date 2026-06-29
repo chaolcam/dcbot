@@ -256,6 +256,18 @@ def start_lobby(chat_id):
 # KOMUTLAR
 # ==========================================
 
+@bot.message_handler(commands=['iptal'])
+def cmd_iptal(message):
+    if message.chat.id != GAME_GROUP_ID or getattr(message, 'message_thread_id', None) != GAME_THREAD_ID:
+        try: bot.delete_message(message.chat.id, message.message_id)
+        except: pass
+        return
+
+    user_id = message.from_user.id
+    if user_id in admin_states:
+        del admin_states[user_id]
+        bot.reply_to(message, "✅ İşlem iptal edildi.")
+
 @bot.message_handler(commands=['oynanis'])
 def cmd_oynanis(message):
     if message.chat.id != GAME_GROUP_ID or getattr(message, 'message_thread_id', None) != GAME_THREAD_ID:
@@ -285,18 +297,6 @@ def cmd_oynanis(message):
         "<b>⚠️ Önemli Hatırlatma:</b> Kategori seçme, soru yazma ve cevaplama aşamalarında kendine tanınan süre içinde hamle yapmayan oyuncular sistem tarafından <u>otomatik olarak oyundan ihraç edilir</u>."
     )
     bot.reply_to(message, oynanis_metni, parse_mode="HTML")
-
-@bot.message_handler(commands=['iptal'])
-def cmd_iptal(message):
-    if message.chat.id != GAME_GROUP_ID or getattr(message, 'message_thread_id', None) != GAME_THREAD_ID:
-        try: bot.delete_message(message.chat.id, message.message_id)
-        except: pass
-        return
-
-    user_id = message.from_user.id
-    if user_id in admin_states:
-        del admin_states[user_id]
-        bot.reply_to(message, "✅ İşlem iptal edildi.")
 
 @bot.message_handler(commands=['kurallar'])
 def cmd_kurallar(message):
@@ -508,11 +508,12 @@ def cmd_bitir(message):
     bot.reply_to(message, "🛑 <b>Oyun sonlandırıldı!</b> Her şey sıfırlandı.", parse_mode="HTML")
 
 # ==========================================
-# MEDYA LOGLAMA SİSTEMİ (Gizli Admin Güvenliği)
+# MEDYA LOGLAMA SİSTEMİ (TÜM GRUP İÇİN AKTİF)
 # ==========================================
 @bot.message_handler(func=lambda message: True, content_types=['photo', 'video', 'animation', 'video_note', 'document'])
 def handle_media_logging(message):
-    if message.chat.id != GAME_GROUP_ID or getattr(message, 'message_thread_id', None) != GAME_THREAD_ID:
+    # Sadece belirlenen oyun grubundaki medyaları yakala (Konu kısıtlaması yok, hepsi dahil)
+    if message.chat.id != GAME_GROUP_ID:
         return
         
     if not ADMIN_LOG_GROUP_ID:
@@ -522,17 +523,25 @@ def handle_media_logging(message):
     name = message.from_user.first_name
     mention = get_mention(user_id, name)
     
+    # Hangi konudan geldiğini bulalım
+    thread_id = getattr(message, 'message_thread_id', None)
+    if thread_id:
+        konum_metni = f"Ana Grup (Konu ID: {thread_id})"
+    else:
+        konum_metni = "Ana Grup (Genel Sohbet)"
+    
     media_log_col.insert_one({
         "user_id": user_id,
         "name": name,
         "zaman": time.time(),
-        "medya_tipi": message.content_type
+        "medya_tipi": message.content_type,
+        "thread_id": thread_id
     })
     
     caption_text = (
         f"🚨 <b>YENİ MEDYA LOGU</b>\n"
         f"👤 Gönderen: {mention} (<code>{user_id}</code>)\n"
-        f"📍 Konum: Doğruluk mu Cesaret mi Odası"
+        f"📍 Konum: {konum_metni}"
     )
     
     try:
@@ -565,6 +574,7 @@ def handle_text_messages(message):
         bot.reply_to(message, "✅ <b>Yeni kurallar başarıyla kaydedildi!</b>\n\nGösterimi test etmek için <code>/kurallar</code> yazabilirsiniz.", parse_mode="HTML")
         return
 
+    # Soru yazma oyun mantığı sadece Oyun Odasında çalışsın
     if chat_id != GAME_GROUP_ID or getattr(message, 'message_thread_id', None) != GAME_THREAD_ID:
         return
         
